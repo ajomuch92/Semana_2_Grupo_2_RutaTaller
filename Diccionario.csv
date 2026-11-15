@@ -1,0 +1,23 @@
+﻿Archivo,Campo,Definicion
+Eventos.csv,Evento_ID,Identificador único después de eliminar duplicados
+Eventos.csv,Fecha,Fecha del momento de decisión
+Eventos.csv,Centro_ID,Llave del centro
+Eventos.csv,Familia_ID,Llave de la familia
+Eventos.csv,Complejidad,Escala de 1 a 5 registrada al recibir la orden
+Eventos.csv,Horas_comprometidas,Horas prometidas al cliente
+Eventos.csv,Horas_transcurridas,Horas consumidas hasta el punto de decisión
+Eventos.csv,Fallas_prueba,Pruebas con resultado anómalo detectadas antes de cerrar
+Eventos.csv,Piezas_sustituidas,Cantidad de piezas reemplazadas antes del cierre
+Eventos.csv,Reingreso_30d,"Resultado posterior. 1 si regresó por la misma falla en los 30 días siguientes, 0 si no"
+Eventos.csv,Costo_retrabajo_L,"Resultado posterior. Costo observado de mano de obra y repuestos del retrabajo, cero si no hubo reingreso"
+Centros.json,Centro_ID,Llave del centro
+Centros.json,Centro,Ciudad del centro
+Familias.xml,Familia_ID,Llave de familia
+Familias.xml,Nombre,Categoría operativa
+Calendario.txt,Fecha,Llave diaria de julio a octubre de 2026
+Calendario.txt,Mes,Número del mes
+Calendario.txt,Dia_semana,Día ISO de 1 lunes a 7 domingo
+Capacidad.csv,Fecha + Centro_ID,"Llave compuesta, una fila por centro y día"
+Capacidad.csv,Minutos_disponibles,Tiempo total que puede dedicar el centro a la nueva intervención ese día
+Capacidad.csv,Minutos_evento,Tiempo estimado por intervención
+Capacidad.csv,Tarifa_hora_L,Costo laboral por hora en lempiras
