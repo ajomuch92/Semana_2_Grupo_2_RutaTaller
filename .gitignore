@@ -1,0 +1,18 @@
+# Credenciales
+.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Power BI / Office temporales
+*.pbix.bak
+~$*
+.~lock.*#
+
+# Sistema / editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
