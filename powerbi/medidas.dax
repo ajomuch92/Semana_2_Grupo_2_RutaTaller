@@ -1,0 +1,43 @@
+// RutaTaller · medidas DAX (crear en una tabla "Medidas")
+// Relaciones: DimFecha, DimCentro, DimFamilia -> FactEvento; DimFecha, DimCentro -> FactCapacidad;
+//             FactEvento -> ResultadoRegla (Evento_ID); DimRegla -> ResultadoRegla.
+// Las medidas de reglas exigen UNA regla/escenario seleccionado (si no, devuelven BLANK).
+// DIVIDE devuelve BLANK cuando el denominador es 0 (se muestra N/D).
+
+Ordenes = COUNTROWS ( FactEvento )
+Reingresos = SUM ( FactEvento[Reingreso_30d] )
+Costo retrabajo L = SUM ( FactEvento[Costo_retrabajo_L] )
+
+KPI1 Tasa reingreso = DIVIDE ( [Reingresos], [Ordenes] )
+KPI2 Costo retrabajo por orden = DIVIDE ( [Costo retrabajo L], [Ordenes] )
+
+Regla seleccionada = HASONEVALUE ( DimRegla[ReglaKey] )
+
+Candidatos = IF ( [Regla seleccionada], COUNTROWS ( ResultadoRegla ) )
+Atendibles = IF ( [Regla seleccionada], CALCULATE ( COUNTROWS ( ResultadoRegla ), ResultadoRegla[Atendible] = 1 ) + 0 )
+Fuera de capacidad = [Candidatos] - [Atendibles]
+Minutos requeridos = IF ( [Regla seleccionada], SUMX ( ResultadoRegla, RELATED ( FactEvento[Minutos_evento] ) ) )
+Minutos usados = IF ( [Regla seleccionada], SUMX ( FILTER ( ResultadoRegla, ResultadoRegla[Atendible] = 1 ), RELATED ( FactEvento[Minutos_evento] ) ) + 0 )
+// La capacidad no depende de la familia: filtrar por familia no la reduce.
+Minutos disponibles = SUM ( FactCapacidad[Minutos_disponibles] ) * SELECTEDVALUE ( DimRegla[FactorCapacidad], 1 )
+Uso de capacidad = DIVIDE ( [Minutos usados], [Minutos disponibles] )
+Costo laboral L = IF ( [Regla seleccionada], SUMX ( FILTER ( ResultadoRegla, ResultadoRegla[Atendible] = 1 ), RELATED ( FactEvento[Costo_revision_L] ) ) + 0 )
+Reingresos cubiertos = IF ( [Regla seleccionada], SUMX ( FILTER ( ResultadoRegla, ResultadoRegla[Atendible] = 1 ), RELATED ( FactEvento[Reingreso_30d] ) ) + 0 )
+Pierden holgura = IF ( [Regla seleccionada], SUMX ( FILTER ( ResultadoRegla, ResultadoRegla[Atendible] = 1 ), RELATED ( FactEvento[Pierde_holgura] ) ) + 0 )
+
+// Denominador = TODOS los reingresos del filtro (no solo candidatos)
+KPI3 Cobertura reingresos = DIVIDE ( [Reingresos cubiertos], [Reingresos] )
+KPI4 Precision revision = DIVIDE ( [Reingresos cubiertos], [Atendibles] )
+KPI5 Pct pierden holgura = DIVIDE ( [Pierden holgura], [Atendibles] )
+KPI6 Costo por reingreso cubierto = DIVIDE ( [Costo laboral L], [Reingresos cubiertos] )
+
+// Semáforos (usar en formato condicional: 1 verde, 2 amarillo, 3 rojo)
+Semaforo KPI1 = SWITCH ( TRUE (), ISBLANK ( [KPI1 Tasa reingreso] ), BLANK (), [KPI1 Tasa reingreso] <= 0.095, 1, [KPI1 Tasa reingreso] <= 0.109, 2, 3 )
+Semaforo KPI2 = SWITCH ( TRUE (), ISBLANK ( [KPI2 Costo retrabajo por orden] ), BLANK (), [KPI2 Costo retrabajo por orden] <= 141.5, 1, [KPI2 Costo retrabajo por orden] <= 161.8, 2, 3 )
+Semaforo KPI3 = SWITCH ( TRUE (), ISBLANK ( [KPI3 Cobertura reingresos] ), BLANK (), [KPI3 Cobertura reingresos] >= 0.45, 1, [KPI3 Cobertura reingresos] >= 0.35, 2, 3 )
+Semaforo KPI4 = SWITCH ( TRUE (), ISBLANK ( [KPI4 Precision revision] ), BLANK (), [KPI4 Precision revision] >= 0.18, 1, [KPI4 Precision revision] >= 0.14, 2, 3 )
+Semaforo KPI5 = SWITCH ( TRUE (), ISBLANK ( [KPI5 Pct pierden holgura] ), BLANK (), [KPI5 Pct pierden holgura] <= 0.01, 1, [KPI5 Pct pierden holgura] <= 0.02, 2, 3 )
+Semaforo KPI6 = SWITCH ( TRUE (), [Costo laboral L] > 0 && [Reingresos cubiertos] = 0, 3, ISBLANK ( [KPI6 Costo por reingreso cubierto] ), BLANK (), [KPI6 Costo por reingreso cubierto] <= 300, 1, [KPI6 Costo por reingreso cubierto] <= 400, 2, 3 )
+
+// Diagnóstico de plazos (página 1)
+Pct ordenes vencidas = DIVIDE ( CALCULATE ( [Ordenes], FactEvento[Holgura_h] < 0 ), [Ordenes] )
