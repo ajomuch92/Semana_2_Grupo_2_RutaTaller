@@ -1,0 +1,266 @@
+Instrucciones para crear y alimentar el archivo de Power BI - RutaTaller, Grupo 2
+
+
+Antes de empezar
+
+- Se necesita Power BI Desktop (solo existe para Windows).
+- La base ajomuch92_ruta_taller ya debe tener los datos: haber corrido sql/01, sql/02 y
+  sql/03, y después python etl/cargar.py sin errores.
+- Tener a mano los datos del archivo .env: servidor, puerto, usuario y contraseña.
+- Los nombres de tablas, columnas y medidas deben quedar igual que en este documento,
+  porque las medidas DAX dependen de ellos.
+- Las medidas están en powerbi/medidas.dax.
+- El archivo final se llamará RutaTaller_Grupo2.pbix.
+
+
+1. Conectar Power BI a la base de datos
+
+1.1. Abrir Power BI Desktop y crear un informe en blanco.
+1.2. Inicio > Obtener datos > SQL Server.
+1.3. En "Servidor" escribir el valor de DB_SERVER tal como está en el .env, incluida la
+     instancia si la tiene (por ejemplo sql.bsite.net\MSSQL2016). Si el puerto no es 1433,
+     agregarlo después de una coma: servidor,puerto.
+1.4. En "Base de datos" escribir: ajomuch92_ruta_taller
+1.5. En "Modo de conectividad de datos" elegir Importar.
+1.6. Aceptar. Cuando pida credenciales, ir a la pestaña "Base de datos" (no "Windows")
+     y escribir el usuario y la contraseña del .env.
+1.7. Si aparece un aviso de que la conexión no está cifrada, aceptar para continuar sin
+     cifrado. Es normal con servidores de prueba.
+
+
+2. Elegir las tablas
+
+2.1. En la ventana "Navegador", marcar solo estas 7 tablas:
+       dw.DimFecha
+       dw.DimCentro
+       dw.DimFamilia
+       dw.DimRegla
+       dw.FactEvento
+       dw.FactCapacidad
+       dw.ResultadoRegla
+     No marcar las tablas stg (datos crudos) ni etl (bitácora de controles).
+2.2. Hacer clic en "Transformar datos" (no en "Cargar").
+2.3. En Power Query, cambiar el nombre de cada consulta quitando el prefijo "dw ". Por
+     ejemplo, "dw FactEvento" pasa a llamarse "FactEvento". Para renombrar: doble clic
+     sobre el nombre en el panel izquierdo.
+2.4. No hacer ninguna otra transformación: la limpieza ya se hizo en SQL.
+2.5. Inicio > Cerrar y aplicar. Esperar a que termine la carga.
+2.6. Revisar en la vista de tabla (icono de cuadrícula a la izquierda) que cada tabla
+     tenga estas filas. El conteo aparece abajo a la izquierda:
+       DimFecha        123
+       DimCentro         6
+       DimFamilia        8
+       DimRegla          4
+       FactEvento    10000
+       FactCapacidad   738
+       ResultadoRegla 17336
+
+
+3. Crear las relaciones
+
+3.1. Ir a la vista Modelo (tercer icono a la izquierda).
+3.2. Si Power BI creó relaciones por su cuenta, borrarlas todas: clic derecho sobre la
+     línea > Eliminar.
+3.3. Inicio > Administrar relaciones > Nuevo, y crear estas 7. En todas:
+     cardinalidad "Uno a varios", dirección de filtro cruzado "Único" y relación activa.
+
+       Tabla del lado "uno"      Tabla del lado "varios"
+       DimFecha[FechaKey]        FactEvento[FechaKey]
+       DimCentro[CentroKey]      FactEvento[CentroKey]
+       DimFamilia[FamiliaKey]    FactEvento[FamiliaKey]
+       DimFecha[FechaKey]        FactCapacidad[FechaKey]
+       DimCentro[CentroKey]      FactCapacidad[CentroKey]
+       FactEvento[Evento_ID]     ResultadoRegla[Evento_ID]
+       DimRegla[ReglaKey]        ResultadoRegla[ReglaKey]
+
+3.4. No relacionar FactEvento con FactCapacidad directamente, porque se duplicaría la
+     capacidad. Tampoco relacionar DimFamilia con FactCapacidad: la capacidad es por
+     centro y día, no por familia.
+
+Por qué así: un filtro de fecha, centro o familia pasa a FactEvento y de ahí a
+ResultadoRegla. DimRegla solo filtra ResultadoRegla, de modo que al elegir una regla el
+total de reingresos del período (denominador de la cobertura) no cambia.
+
+
+4. Ajustar columnas
+
+4.1. Seleccionar la tabla DimFecha > Herramientas de tabla > Marcar como tabla de fechas
+     > columna Fecha.
+4.2. Seleccionar la columna DimFecha[NombreMes] > Herramientas de columnas > Ordenar por
+     columna > Mes.
+4.3. Seleccionar DimFecha[NombreDia] > Ordenar por columna > Dia_semana.
+4.4. En FactEvento, a las columnas Complejidad, Fallas_prueba y Puntaje_riesgo ponerles
+     Resumen = "No resumir". Se usan como categorías, no como valores a sumar.
+4.5. Ocultar (clic derecho > Ocultar en la vista de informe):
+     - todas las columnas que terminan en Key, en todas las tablas;
+     - ResultadoRegla[Evento_ID];
+     - las columnas numéricas de FactEvento, FactCapacidad y ResultadoRegla, excepto
+       las tres del punto 4.4.
+     Así en los gráficos solo se usan medidas y no sumas automáticas.
+
+
+5. Crear las medidas
+
+5.1. Inicio > Especificar datos. Nombrar la tabla "Medidas" y hacer clic en Cargar.
+5.2. Abrir powerbi/medidas.dax. Cada línea que no empieza con // es una medida, con la
+     forma: Nombre = expresión.
+5.3. Seleccionar la tabla Medidas > Nueva medida, pegar una línea completa y presionar
+     Enter. Repetir con cada línea en el mismo orden del archivo (algunas medidas usan
+     otras definidas antes).
+5.4. Cuando ya exista al menos una medida, borrar la columna "Columna1" que se creó en el
+     paso 5.1. La tabla Medidas quedará con un icono de calculadora.
+5.5. Dar formato a cada medida (seleccionarla > Herramientas de medición):
+     - Porcentaje con 1 decimal: KPI1 Tasa reingreso, KPI3 Cobertura reingresos,
+       KPI4 Precision revision, KPI5 Pct pierden holgura, Uso de capacidad,
+       Pct ordenes vencidas.
+     - Lempiras con 2 decimales: KPI2 Costo retrabajo por orden,
+       KPI6 Costo por reingreso cubierto, Costo retrabajo L, Costo laboral L.
+       Usar formato personalizado: "L "#,0.00
+     - Número entero con separador de miles: todas las demás.
+5.6. Las medidas de reglas (Candidatos, Atendibles, Costo laboral L, KPI3 a KPI6, etc.)
+     salen vacías si no hay exactamente una regla y un escenario a la vista. Es a
+     propósito: sumar la regla A con la B no tiene sentido. En las tablas, poner
+     DimRegla[Regla] y DimRegla[Escenario] como filas.
+
+
+6. Segmentadores (filtros)
+
+6.1. En la primera página, agregar cuatro segmentadores:
+     - DimFecha[Periodo], estilo mosaico. Opciones: "Diseño (jul-ago)" y
+       "Prueba (sep-oct)".
+     - DimFecha[NombreMes], estilo lista desplegable.
+     - DimCentro[Centro], lista desplegable con selección múltiple.
+     - DimFamilia[Familia], lista desplegable con selección múltiple.
+6.2. Copiarlos a la segunda página cuando exista y sincronizarlos: Vista > Sincronizar
+     segmentaciones, marcar las dos páginas para cada segmentador.
+6.3. A tener en cuenta: el filtro de familia no reduce los minutos disponibles, porque la
+     capacidad no tiene familia. Con familia filtrada, "Uso de capacidad" no se debe
+     interpretar.
+
+
+7. Página 1: Diagnóstico
+
+Pregunta que responde: dónde está el problema de reingreso y de plazos.
+
+7.1. Renombrar la página como "Diagnóstico".
+7.2. Cuatro tarjetas en la parte superior: Ordenes, KPI1 Tasa reingreso,
+     KPI2 Costo retrabajo por orden y Pct ordenes vencidas.
+7.3. Color de las tarjetas KPI1 y KPI2: Formato > Valor > Color > botón fx > Estilo de
+     formato "Reglas" > campo "Semaforo KPI1" (o "Semaforo KPI2"):
+       si el valor es 1: verde   #1B7F3B
+       si el valor es 2: amarillo #C99A00
+       si el valor es 3: rojo    #B42318
+7.4. Matriz "Reingreso por complejidad y fallas":
+     Filas = FactEvento[Complejidad], Columnas = FactEvento[Fallas_prueba],
+     Valores = KPI1 Tasa reingreso.
+     Formato condicional > Color de fondo > escala de blanco a rojo.
+     Es la evidencia que justifica las reglas.
+7.5. Gráfico de barras agrupadas: Eje Y = DimFamilia[Familia],
+     Eje X = KPI1 Tasa reingreso, ordenado de mayor a menor.
+7.6. Gráfico de barras agrupadas: Eje Y = DimCentro[Centro], Eje X = KPI1 Tasa reingreso.
+7.7. Gráfico de columnas agrupadas: Eje X = DimFecha[NombreMes],
+     Eje Y = Pct ordenes vencidas y KPI1 Tasa reingreso. Muestra que las órdenes
+     vencidas suben de cerca de 17 % en jul-ago a cerca de 39 % en sep-oct.
+7.8. Cuadro de texto con esta nota: "Reingreso_30d y Costo_retrabajo_L son resultados
+     posteriores a la decisión; se usan solo para evaluar, nunca dentro de las reglas."
+
+
+8. Página 2: Comparación de reglas
+
+Pregunta que responde: qué regla conviene y qué pasa con 20 % menos de capacidad.
+
+8.1. Crear una página nueva y llamarla "Comparación de reglas".
+8.2. Tabla (visual Tabla) con estas columnas, en este orden:
+       DimRegla[Regla], DimRegla[Escenario], Candidatos, Atendibles,
+       Fuera de capacidad, Minutos requeridos, Minutos usados, Minutos disponibles,
+       Costo laboral L, Reingresos cubiertos, KPI3 Cobertura reingresos,
+       KPI4 Precision revision, KPI5 Pct pierden holgura,
+       KPI6 Costo por reingreso cubierto.
+     Desactivar los totales (Formato > Totales > Desactivado).
+     Color de KPI3 a KPI6 con sus medidas Semaforo KPI3 a Semaforo KPI6, con los mismos
+     colores del punto 7.3.
+8.3. Gráfico de columnas agrupadas: Eje X = DimRegla[Escenario],
+     Leyenda = DimRegla[Regla], Eje Y = KPI3 Cobertura reingresos.
+8.4. Otro gráfico igual, pero con Eje Y = Costo laboral L.
+8.5. Opcional: gráfico de dispersión con Leyenda = DimRegla[Regla],
+     Valores (detalles) = DimRegla[Escenario], Eje X = Costo laboral L,
+     Eje Y = KPI3 Cobertura reingresos.
+8.6. Al presentar, dejar el segmentador Periodo en "Prueba (sep-oct)".
+
+Valores que debe mostrar la tabla con Periodo = "Prueba (sep-oct)" y sin otros filtros.
+Si no coinciden, revisar las relaciones (sección 3) y las medidas (sección 5).
+
+  Regla y escenario   Candidatos  Atendibles  Fuera cap.  Costo laboral  Cobertura  Precisión  Pierden holgura
+  A, 100 %                 2512        1394        1118       L 75,166     49.2 %     19.9 %                6
+  B, 100 %                 1496        1114         382       L 60,145     38.2 %     19.4 %                0
+  A, 80 %                  2512        1066        1446       L 57,576     38.4 %     20.4 %                6
+  B, 80 %                  1496         929         567       L 50,302     32.2 %     19.6 %                0
+
+Con Periodo = "Diseño (jul-ago)": KPI1 = 10.9 %, KPI2 = L 161.76 y la cobertura de la
+regla A con 100 % es 50.7 %.
+El costo laboral puede diferir en algunos centavos por redondeo; es normal.
+
+
+9. Verificar dos KPI contra SQL (lo pide el enunciado)
+
+Verificación 1, KPI1:
+9.1. En Power BI: Periodo = "Prueba (sep-oct)", Centro = San Pedro Sula,
+     Familia = Transmisión. Anotar el valor de la tarjeta KPI1.
+9.2. En SQL: correr la consulta 7 de sql/04_controles_y_kpi.sql.
+     Resultado esperado: 13 reingresos de 95 órdenes = 13.68 %.
+
+Verificación 2, KPI3:
+9.3. En Power BI: Periodo = "Prueba (sep-oct)", Centro = San Pedro Sula, Familia sin
+     filtro. Leer KPI3 en la fila "A · Riesgo técnico / Capacidad 100 %" de la tabla.
+9.4. En SQL: correr la consulta 8 del mismo archivo y dividir
+     Reingresos_cubiertos entre Reingresos_totales.
+
+9.5. Tomar una captura de Power BI y otra de SQL para cada verificación y anotar los dos
+     valores en la sección "Comprobación del cálculo" de la Matriz KPI.
+9.6. Si los valores no coinciden, revisar en este orden: un segmentador que quedó
+     filtrado (mes o familia), una relación con filtro en ambas direcciones, o una
+     columna usada directamente en lugar de la medida.
+
+
+10. Guardar
+
+10.1. Poner título a cada página: "RutaTaller · Diagnóstico" y
+      "RutaTaller · Comparación de reglas".
+10.2. Quitar los filtros de los segmentadores, salvo Periodo = "Prueba (sep-oct)" en la
+      página 2.
+10.3. Archivo > Guardar como > RutaTaller_Grupo2.pbix.
+10.4. El .pbix guarda los datos importados y el nombre del servidor, pero no la
+      contraseña. Quien lo abra puede ver el informe sin conectarse a la base.
+
+
+11. Volver a alimentar el informe (actualizar datos)
+
+Hacerlo cada vez que cambien los datos en la base, por ejemplo después de volver a
+correr etl/cargar.py o de cambiar las reglas en sql/03_reglas.sql.
+
+11.1. Si se cambió algo en SQL, primero correr en este orden:
+        - el script SQL modificado (sql/02 o sql/03);
+        - python etl/cargar.py, que vuelve a cargar todo y a simular las reglas.
+11.2. Abrir RutaTaller_Grupo2.pbix.
+11.3. Inicio > Actualizar. Power BI vuelve a leer las 7 tablas.
+11.4. Revisar los conteos de filas del punto 2.6 y los valores de referencia de la
+      sección 8.
+11.5. Guardar el archivo.
+
+Si cambia el servidor, el usuario o la contraseña:
+11.6. Archivo > Opciones y configuración > Configuración de origen de datos.
+11.7. Seleccionar el origen > "Cambiar origen" para el servidor o la base, o
+      "Editar permisos" > Editar para el usuario y la contraseña.
+11.8. Aceptar y volver al punto 11.3.
+
+Si se agregan columnas nuevas en SQL:
+11.9. Inicio > Transformar datos > seleccionar la consulta > Actualizar vista previa >
+      Cerrar y aplicar. Las columnas nuevas aparecen en la tabla correspondiente.
+
+Errores comunes al actualizar:
+- "No se puede conectar con el servidor": revisar que el servidor de pruebas esté
+  encendido y que la red permita la conexión (la misma prueba es correr
+  python etl/cargar.py).
+- "Error de inicio de sesión": corregir las credenciales como en el punto 11.7.
+- Una tabla queda con 0 filas: cargar.py falló a la mitad. Volver a correrlo y revisar
+  que la tabla de controles diga OK en todas las filas.

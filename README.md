@@ -59,6 +59,8 @@ DimFamilia ── FactEvento ──────────── FactCapacidad
 
 ## Power BI
 
+El paso a paso completo está en `INSTRUCCIONES_POWERBI.txt`. Resumen:
+
 1. **Obtener datos** → SQL Server → `ajomuch92_ruta_taller` en modo Import. Tablas a importar:
    - `dw.DimFecha`, `dw.DimCentro`, `dw.DimFamilia`, `dw.DimRegla`
    - `dw.FactEvento`, `dw.FactCapacidad`, `dw.ResultadoRegla`
